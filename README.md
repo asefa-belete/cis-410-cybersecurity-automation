@@ -16,3 +16,11 @@ This repository is my CIS 410: CyberSecurity Automation portfolio. In this cours
 
 ## Fun Fact
 I like to watch soccer game.
+
+## My Week 2 Infrastructure
+
+Runner VM: asefa-cis410-runner
+
+Runner IP: 192.168.1.175 #fake ip
+
+Pipeline status: [![Hello Pipeline](https://github.com/asefa-belete/cis-410-cybersecurity-automation/actions/workflows/hello-pipeline.yml/badge.svg)](https://github.com/asefa-belete/cis-410-cybersecurity-automation/actions/workflows/hello-pipeline.yml)
