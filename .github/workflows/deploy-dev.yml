@@ -41,7 +41,7 @@ jobs:
 
     name: "Build and Deploy to Dev VM"
 
-    runs-on: self-hosted
+    runs-on: Ubuntu-latest
 
 
     steps:

@@ -61,7 +61,7 @@ jobs:
 
     name: "Install Docker on Dev VM"
 
-    runs-on: self-hosted
+    runs-on: Ubuntu-latest
 
 
     steps:
