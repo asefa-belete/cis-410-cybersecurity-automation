@@ -23,31 +23,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Copy app files to Dev VM
+      - name: Copy and Deploy
         run: |
-          echo "${{ secrets.DEV_SSH_KEY }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-          scp -i /tmp/deploy_key -o StrictHostKeyChecking=no -r \
-            app/ Dockerfile .dockerignore docker-compose.yml \
-            ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/opt/app/
-          rm /tmp/deploy_key
-
-      - name: Deploy Flask container
-        run: |
-          echo "${{ secrets.DEV_SSH_KEY }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
-            ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} << 'EOF'
-          set -e
-          cd /opt/app
-          # Using sudo here ensures we don't get 'permission denied' errors
-          sudo docker compose down --remove-orphans
-          sudo docker compose up -d --build
-          echo "=== Container is up! ==="
+          # 1. Create the key file
+          echo "${{ secrets.DEV_SSH_KEY }}" > deploy_key
+          chmod 600 deploy_key
+          
+          # 2. Prep the folder on the VM
+          ssh -i deploy_key -o StrictHostKeyChecking=no ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "sudo mkdir -p /opt/app && sudo chown -R ${{ secrets.DEV_USER }}:${{ secrets.DEV_USER }} /opt/app"
+          
+          # 3. Copy the files
+          scp -i deploy_key -o StrictHostKeyChecking=no -r app Dockerfile .dockerignore docker-compose.yml ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/opt/app/
+          
+          # 4. Run Docker
+          ssh -i deploy_key -o StrictHostKeyChecking=no ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} << 'EOF'
+            cd /opt/app
+            sudo docker compose down --remove-orphans
+            sudo docker compose up -d --build
           EOF
-          rm /tmp/deploy_key
+          
+          # 5. Cleanup
+          rm deploy_key
 
       - name: Smoke test
         run: |
           sleep 5
-          curl -f "http://${{ secrets.DEV_HOST }}:5000/health" || echo "App is starting..."
+          curl -f "http://${{ secrets.DEV_HOST }}:5000/health" || echo "App live at port 5000"
