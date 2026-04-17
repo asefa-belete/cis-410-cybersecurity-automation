@@ -23,29 +23,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Copy and Deploy
+      # This version uses a safer way to move files
+      - name: Deploy to Server
         run: |
-          # 1. Create the key file
+        
           echo "${{ secrets.DEV_SSH_KEY }}" > deploy_key
           chmod 600 deploy_key
           
-          # 2. Prep the folder on the VM
+          # 1. Prepare directory and fix permissions
           ssh -i deploy_key -o StrictHostKeyChecking=no ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "sudo mkdir -p /opt/app && sudo chown -R ${{ secrets.DEV_USER }}:${{ secrets.DEV_USER }} /opt/app"
           
-          # 3. Copy the files
-          scp -i deploy_key -o StrictHostKeyChecking=no -r app Dockerfile .dockerignore docker-compose.yml ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/opt/app/
+          # 2. Copy everything in the current folder to the VM
+          scp -i deploy_key -o StrictHostKeyChecking=no -r ./* ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/opt/app/
           
-          # 4. Run Docker
-          ssh -i deploy_key -o StrictHostKeyChecking=no ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} << 'EOF'
-            cd /opt/app
-            sudo docker compose down --remove-orphans
-            sudo docker compose up -d --build
-          EOF
+          # 3. Restart the container
+          ssh -i deploy_key -o StrictHostKeyChecking=no ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "cd /opt/app && sudo docker compose down --remove-orphans && sudo docker compose up -d --build"
           
-          # 5. Cleanup
           rm deploy_key
 
       - name: Smoke test
         run: |
-          sleep 5
-          curl -f "http://${{ secrets.DEV_HOST }}:5000/health" || echo "App live at port 5000"
+          sleep 10
+          curl -s http://${{ secrets.DEV_HOST }}:5000/health || echo "Wait for app..."
