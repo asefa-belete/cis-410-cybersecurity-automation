@@ -7,121 +7,45 @@
 
 name: "Deploy — Dev"
 
-
 on:
-
   push:
-
     branches: [main]
-
+  workflow_dispatch:
 
 jobs:
-
   deploy:
-
     name: "Build and Deploy to Dev VM"
-
     runs-on: self-hosted
     env:
-      # Fix for the Node.js deprecation warning in 2026
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-
-      # ── Step 1: Check out the latest code ──────────────────────────────────
-
-
-
       - name: Checkout
-    
-
         uses: actions/checkout@v4
 
-
-      # ── Step 2: Copy app files to the Dev VM ──────────────────────────────
-
       - name: Copy app files to Dev VM
-
-
         run: |
-
           echo "${{ secrets.DEV_SSH_KEY }}" > /tmp/deploy_key
-
           chmod 600 /tmp/deploy_key
-
-
           scp -i /tmp/deploy_key -o StrictHostKeyChecking=no -r \
-
             app/ Dockerfile .dockerignore docker-compose.yml \
-
             ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/opt/app/
-
-
           rm /tmp/deploy_key
-
-
-      # ── Step 3: Build the image and start the container ────────────────────
-
-
 
       - name: Deploy Flask container
-
         run: |
-
           echo "${{ secrets.DEV_SSH_KEY }}" > /tmp/deploy_key
-
           chmod 600 /tmp/deploy_key
-
-
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
-
             ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} << 'EOF'
-
           set -e
-
           cd /opt/app
-
-
-          export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-
-          export GITHUB_SHA="${{ github.sha }}"
-
-          export GITHUB_REF_NAME="${{ github.ref_name }}"
-
-
-          echo "=== Deploying ${GITHUB_SHA:0:7} from ${GITHUB_REF_NAME} ==="
-
-
           sudo docker compose down --remove-orphans
-
-          sudo DEPLOY_TIME="${DEPLOY_TIME}" GITHUB_SHA="${GITHUB_SHA}" GITHUB_REF_NAME="${GITHUB_REF_NAME}" \
-
-            docker compose up -d --build
-
-
-          echo "=== Deploy complete ==="
-
-        
-          sudo docker compose ps
-
+          sudo docker compose up -d --build
           EOF
-
-
           rm /tmp/deploy_key
 
-
-      # ── Step 4: Smoke test ──────────────────────────────────────────────────
-
-    
-
       - name: Smoke test
-
         run: |
-
-          sleep 4
-
-          curl -f "http://${{ secrets.DEV_HOST }}:5000/health" | python3 -m json.tool
-
-
-          echo "=== Smoke test passed — app is live at http://${{ secrets.DEV_HOST }}:5000 ==="
-          
+          sleep 5
+          curl -f "http://${{ secrets.DEV_HOST }}:5000/health"
