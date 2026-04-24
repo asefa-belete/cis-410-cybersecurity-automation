@@ -58,15 +58,15 @@ jobs:
         run: echo "STAGING DEPLOY — ${{ github.event.inputs.reason || 'no reason provided' }} — ${{ github.actor }}"
 
 
-      # Step 3: Copy app files to /opt/app on Staging
+      # Step 3: Copy app files
       - name: Copy app files to Staging VM
 
         run: |
 
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
-          
+
           chmod 600 /tmp/staging_key
-          # We use a single line here to avoid backslash errors on the runner
+          # Simplified: No backslashes, no .dockerignore
           scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r app/ Dockerfile docker-compose.yml ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
           rm /tmp/staging_key
 
@@ -80,22 +80,17 @@ jobs:
         run: |
 
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
-
+          
           chmod 600 /tmp/staging_key
-          # Connecting to the VM to run Docker commands
-          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
-            set -e
-            cd /opt/app
-            export HOST_PORT=5001
-            export ENVIRONMENT=staging
-            echo "=== Deploying to staging (port ${HOST_PORT}) ==="
-            sudo docker compose down --remove-orphans
-            sudo HOST_PORT=${HOST_PORT} ENVIRONMENT=${ENVIRONMENT} docker compose up -d --build
-            echo '=== Staging deploy complete ==='
-            sudo docker compose ps
-          EOF
-
+          # Run everything in one simple SSH command string
+          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "cd /opt/app && sudo HOST_PORT=5001 ENVIRONMENT=staging docker compose down --remove-orphans && sudo HOST_PORT=5001 ENVIRONMENT=staging docker compose up -d --build && sudo docker compose ps"
           rm /tmp/staging_key
+
+      # Step 5: Smoke test
+      - name: Smoke test
+        run: |
+          sleep 5
+          curl -f "http://${{ secrets.STAGING_HOST }}:5001/health" | python3 -m json.tool
 
 
       # Step 5: Smoke test — confirms the app is up and responding
