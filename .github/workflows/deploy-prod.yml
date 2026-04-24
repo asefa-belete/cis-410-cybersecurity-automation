@@ -1,7 +1,19 @@
 # .github/workflows/deploy-prod.yml
 
 # ─────────────────────────────────────────────────────────────────────────
-# Production deployment with audit trail and Port 5002 support.
+
+# Lean deploy — Docker already installed by setup-prod.yml.
+
+# Trigger: manual only (workflow_dispatch).
+
+# reason is REQUIRED — every production deploy needs an audit trail.
+
+# GitHub enforces this: the Run workflow button is disabled until you type a reason.
+
+#
+
+# No Docker required on yourname-runner — uses native ssh and scp only.
+
 # ─────────────────────────────────────────────────────────────────────────
 
 
@@ -42,24 +54,7 @@ jobs:
 
 
 
-      - name: Log deployment reason
 
-        run: |
-
-          echo "=== PRODUCTION DEPLOY ==="
-
-          echo "Triggered by: ${{ github.actor }}"
-
-          echo "Reason: ${{ github.event.inputs.reason }}"
-
-          echo "Commit: ${{ github.sha }}"
-
-          echo "Branch: ${{ github.ref_name }}"
-
-          echo "Timestamp: $(date -u)"
-
-      # Step 3: Copy app files
-      # Removed .dockerignore from list to avoid "No such file" errors
       - name: Copy app files to Production VM
 
         run: |
@@ -67,16 +62,11 @@ jobs:
           echo "${{ secrets.PROD_SSH_KEY }}" > /tmp/prod_key
 
           chmod 600 /tmp/prod_key
-
-          scp -i /tmp/prod_key -o StrictHostKeyChecking=no -r \
-            app/ Dockerfile docker-compose.yml \
-            ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}:/opt/app/
-
+          scp -i /tmp/prod_key -o StrictHostKeyChecking=no -r app/ Dockerfile docker-compose.yml ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}:/opt/app/
           rm /tmp/prod_key
 
 
-      # Step 4: Build and start the container
-      # Using sudo -E to ensure HOST_PORT=5002 reaches the dashboard
+
       - name: Deploy Flask container on Production
 
         run: |
@@ -84,46 +74,22 @@ jobs:
           echo "${{ secrets.PROD_SSH_KEY }}" > /tmp/prod_key
 
           chmod 600 /tmp/prod_key
-
-          ssh -i /tmp/prod_key -o StrictHostKeyChecking=no \
-
-            ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} << 'EOF'
-
-          set -e
-
-          cd /opt/app
-
-          export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-
-          export GITHUB_SHA="${{ github.sha }}"
-
-          export GITHUB_REF_NAME="${{ github.ref_name }}"
-
-          export HOST_PORT=5002
-
-          export ENVIRONMENT=production
-          
-          echo "=== Deploying ${GITHUB_SHA:0:7} to production (port ${HOST_PORT}) ==="
-          
-          sudo -E docker compose down --remove-orphans
-          
-          sudo -E HOST_PORT="${HOST_PORT}" ENVIRONMENT="${ENVIRONMENT}" \
-               DEPLOY_TIME="${DEPLOY_TIME}" GITHUB_SHA="${GITHUB_SHA}" \
-
-               GITHUB_REF_NAME="${GITHUB_REF_NAME}" \
-
-               docker compose up -d --build
-               
-          echo '=== Production deploy complete ==='
-
-          sudo docker compose ps
-
+          ssh -i /tmp/prod_key -o StrictHostKeyChecking=no ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }} << 'EOF'
+            set -e
+            cd /opt/app
+            export HOST_PORT=5002
+            export ENVIRONMENT=production
+            export GITHUB_SHA=${{ github.sha }}
+            export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            
+            sudo -E docker compose down --remove-orphans
+            sudo -E HOST_PORT=${HOST_PORT} ENVIRONMENT=${ENVIRONMENT} DEPLOY_TIME="${DEPLOY_TIME}" GITHUB_SHA="${GITHUB_SHA}" docker compose up -d --build
           EOF
 
           rm /tmp/prod_key
 
 
-      # Step 5: Smoke test on port 5002
+
 
       - name: Smoke test
 
@@ -131,5 +97,4 @@ jobs:
           sleep 5
           curl -f "http://${{ secrets.PROD_HOST }}:5002/health" | python3 -m json.tool
 
-          echo '=== Production smoke test passed ==='
-          
+           echo '=== Production smoke test passed ==='
