@@ -1,18 +1,19 @@
 # .github/workflows/deploy-staging.yml
 
-# ─────────────────────────────────────────────────────────────────────────
+
 
 # Lean deploy — Docker already installed by setup-staging.yml.
 
 # Trigger: manual only (workflow_dispatch).
 
-# reason is optional for staging — required on production.
 
-#
 
-# No Docker required on yourname-runner — uses native ssh and scp only.
 
-# ─────────────────────────────────────────────────────────────────────────
+
+
+
+
+
 
 
 name: "Deploy — Staging"
@@ -27,9 +28,7 @@ on:
       reason:
 
         description: 'Reason for this deployment (e.g. QA approved, ticket PROJ-142)'
-
-        required: false    # Optional for staging — required: true on production
-
+        required: false
 
 jobs:
 
@@ -41,27 +40,17 @@ jobs:
 
 
     steps:
-
-      # Step 1: Check out the code so scp can access the files
-
+      # Step 1: Check out the code
       - name: Checkout
 
         uses: actions/checkout@v4
 
-
-      # Step 2: Write the reason to the run log — permanent audit trail entry
-
-      # github.actor = GitHub username of whoever clicked Run workflow
-
+      # Step 2: Log deployment reason
       - name: Log deployment reason
 
         run: echo "STAGING DEPLOY — ${{ github.event.inputs.reason || 'no reason provided' }} — ${{ github.actor }}"
 
-
-      # Step 3: Copy app files to /opt/app on yourname-staging
-
-      # Key is written to /tmp, used, then deleted in the same step.
-
+      # Step 3: Copy app files to /opt/app on Staging VM
       - name: Copy app files to Staging VM
 
         run: |
@@ -69,29 +58,15 @@ jobs:
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
 
           chmod 600 /tmp/staging_key
-
-          scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r \
-
-            app/ Dockerfile .dockerignore docker-compose.yml \
-
-            ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
-
+          # Fixed scp syntax: Single line to prevent "Usage" errors
+          scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r app/ Dockerfile .dockerignore docker-compose.yml ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
           rm /tmp/staging_key
 
 
       # Step 4: Build and start the container
 
-      # sudo docker — SSH sessions may not activate the docker group set during setup.
 
-      # Passwordless sudo (configured by setup-staging.yml) handles this cleanly.
 
-      # HOST_PORT=5001 maps host port 5001 to container port 5000 so staging
-
-      # runs on a different port than dev (5000) and prod (5002).
-
-      # ENVIRONMENT=staging is injected into the container so the dashboard
-
-      # shows 'staging' and the STAGING badge in the top-right corner.
 
       - name: Deploy Flask container on Staging
 
@@ -100,56 +75,31 @@ jobs:
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
 
           chmod 600 /tmp/staging_key
-
-          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no \
-
-            ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
-
-          set -e
-
-          cd /opt/app
-
-          export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-
-          export GITHUB_SHA="${{ github.sha }}"
-
-          export GITHUB_REF_NAME="${{ github.ref_name }}"
-
-          export HOST_PORT=5001
-
-          export ENVIRONMENT=staging
-
-          echo "=== Deploying ${GITHUB_SHA:0:7} to staging (port ${HOST_PORT}) ==="
-
-          sudo docker compose down --remove-orphans
-
-          sudo HOST_PORT="${HOST_PORT}" ENVIRONMENT="${ENVIRONMENT}" \
-
-               DEPLOY_TIME="${DEPLOY_TIME}" GITHUB_SHA="${GITHUB_SHA}" \
-
-               GITHUB_REF_NAME="${GITHUB_REF_NAME}" \
-
-               docker compose up -d --build
-
-          echo '=== Staging deploy complete ==='
-
-          sudo docker compose ps
-
+          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+            set -e
+            cd /opt/app
+            export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            export GITHUB_SHA="${{ github.sha }}"
+            export GITHUB_REF_NAME="${{ github.ref_name }}"
+            export HOST_PORT=5001
+            export ENVIRONMENT=staging
+            echo "=== Deploying ${GITHUB_SHA:0:7} to staging (port ${HOST_PORT}) ==="
+            sudo docker compose down --remove-orphans
+            sudo HOST_PORT="${HOST_PORT}" ENVIRONMENT="${ENVIRONMENT}" \
+                 DEPLOY_TIME="${DEPLOY_TIME}" GITHUB_SHA="${GITHUB_SHA}" \
+                 GITHUB_REF_NAME="${GITHUB_REF_NAME}" \
+                 docker compose up -d --build
+            echo '=== Staging deploy complete ==='
+            sudo docker compose ps
           EOF
 
           rm /tmp/staging_key
 
-
-      # Step 5: Smoke test — confirms the app is up and responding
-
-      # curl -f returns a non-zero exit code on 4xx/5xx — fails the whole run
-
+      # Step 5: Smoke test
       - name: Smoke test
 
         run: |
-
-          sleep 4
-
+          sleep 5
           curl -f "http://${{ secrets.STAGING_HOST }}:5001/health" | python3 -m json.tool
 
           echo '=== Staging smoke test passed ==='
