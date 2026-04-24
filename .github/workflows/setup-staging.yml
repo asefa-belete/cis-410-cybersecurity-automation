@@ -26,7 +26,7 @@ jobs:
 
       # Step 1: Configure passwordless sudo
 
-      # Uses SUDO_PASS if passwordless sudo is not yet configured.
+
 
       - name: Configure passwordless sudo
 
@@ -35,21 +35,12 @@ jobs:
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
 
           chmod 600 /tmp/staging_key
-
-          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no \
-
-            ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} \
-
-            "if sudo -n true 2>/dev/null; then
-
+          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "
+            if sudo -n true 2>/dev/null; then
               echo '=== Passwordless sudo already configured ==='
 
             else
-
-              echo '${{ secrets.SUDO_PASS }}' | sudo -S bash -c \
-
-                'echo \"${{ secrets.STAGING_USER }} ALL=(ALL) NOPASSWD:ALL\" > /etc/sudoers.d/${{ secrets.STAGING_USER }} && chmod 0440 /etc/sudoers.d/${{ secrets.STAGING_USER }}'
-
+              echo '${{ secrets.SUDO_PASS }}' | sudo -S bash -c 'echo \"${{ secrets.STAGING_USER }} ALL=(ALL) NOPASSWD:ALL\" > /etc/sudoers.d/${{ secrets.STAGING_USER }} && chmod 0440 /etc/sudoers.d/${{ secrets.STAGING_USER }}'
               echo '=== Passwordless sudo configured ==='
 
             fi"
@@ -66,44 +57,26 @@ jobs:
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
 
           chmod 600 /tmp/staging_key
-
-          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no \
-
-            ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
-
-          set -e
-
-          if ! command -v docker &> /dev/null; then
-
-            echo "=== Docker not found — installing ==="
-
-            curl -fsSL https://get.docker.com -o get-docker.sh
-
-            sudo sh get-docker.sh
-
-            sudo usermod -aG docker $(whoami)
-
-            sudo mkdir -p /opt/app && sudo chown $(whoami):$(whoami) /opt/app
-
-            rm get-docker.sh
-
-            echo "=== Docker installed successfully ==="
-
-          else
-
-            echo "=== Docker already present — skipping ==="
-
-            sudo mkdir -p /opt/app && sudo chown $(whoami):$(whoami) /opt/app
-
-          fi
-
+          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+            set -e
+            if ! command -v docker &> /dev/null; then
+              echo "=== Docker not found — installing ==="
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh
+              sudo usermod -aG docker $(whoami)
+              sudo mkdir -p /opt/app && sudo chown $(whoami):$(whoami) /opt/app
+              rm get-docker.sh
+              echo "=== Docker installed successfully ==="
+            else
+              echo "=== Docker already present — skipping ==="
+              sudo mkdir -p /opt/app && sudo chown $(whoami):$(whoami) /opt/app
+            fi
           EOF
 
           rm /tmp/staging_key
 
 
-      # Step 3: Verify
-
+     # Step 3: Verify
       - name: Verify Docker
 
         run: |
@@ -111,23 +84,13 @@ jobs:
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
 
           chmod 600 /tmp/staging_key
-
-          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no \
-
-            ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
-
-          set -e
-
-          echo "=== Logged in as: $(whoami) ==="
-
-          docker --version
-
-          docker compose version
-
-          ls -la /opt/app
-
-          echo "=== Staging server is ready for deployment ==="
-
+          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+            set -e
+            echo "=== Logged in as: $(whoami) ==="
+            docker --version
+            docker compose version
+            ls -la /opt/app
+            echo "=== Staging server is ready for deployment ==="
           EOF
-
+          
           rm /tmp/staging_key
