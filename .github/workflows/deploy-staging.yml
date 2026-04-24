@@ -1,20 +1,9 @@
 # .github/workflows/deploy-staging.yml
-
-
-
+# ─────────────────────────────────────────────────────────────────────────
 # Lean deploy — Docker already installed by setup-staging.yml.
 
 # Trigger: manual only (workflow_dispatch).
-
-
-
-
-
-
-
-
-
-
+# ─────────────────────────────────────────────────────────────────────────
 
 name: "Deploy — Staging"
 
@@ -45,7 +34,7 @@ jobs:
 
         uses: actions/checkout@v4
 
-      # Step 2: Log deployment reason
+      # Step 2: Write deployment reason to audit trail
       - name: Log deployment reason
 
         run: echo "STAGING DEPLOY — ${{ github.event.inputs.reason || 'no reason provided' }} — ${{ github.actor }}"
@@ -58,7 +47,7 @@ jobs:
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
 
           chmod 600 /tmp/staging_key
-          # Fixed scp syntax: Single line to prevent "Usage" errors
+          # Fixed scp: Combined to one line and ensuring no space between user and host
           scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r app/ Dockerfile .dockerignore docker-compose.yml ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
           rm /tmp/staging_key
 
@@ -101,5 +90,5 @@ jobs:
         run: |
           sleep 5
           curl -f "http://${{ secrets.STAGING_HOST }}:5001/health" | python3 -m json.tool
-
+          
           echo '=== Staging smoke test passed ==='
