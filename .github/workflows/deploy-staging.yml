@@ -58,38 +58,22 @@ jobs:
         run: echo "STAGING DEPLOY — ${{ github.event.inputs.reason || 'no reason provided' }} — ${{ github.actor }}"
 
 
-      # Step 3: Copy app files to /opt/app on yourname-staging
-
-      # Key is written to /tmp, used, then deleted in the same step.
-
+      # Step 3: Copy app files to /opt/app on Staging
       - name: Copy app files to Staging VM
 
         run: |
 
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
-
+          
           chmod 600 /tmp/staging_key
-
-          scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r \
-            app/ Dockerfile docker-compose.yml \
-            ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
-            
+          # We use a single line here to avoid backslash errors on the runner
+          scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r app/ Dockerfile docker-compose.yml ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
           rm /tmp/staging_key
 
 
       # Step 4: Build and start the container
 
-      # sudo docker — SSH sessions may not activate the docker group set during setup.
 
-      # Passwordless sudo (configured by setup-staging.yml) handles this cleanly.
-
-      # HOST_PORT=5001 maps host port 5001 to container port 5000 so staging
-
-      # runs on a different port than dev (5000) and prod (5002).
-
-      # ENVIRONMENT=staging is injected into the container so the dashboard
-
-      # shows 'staging' and the STAGING badge in the top-right corner.
 
       - name: Deploy Flask container on Staging
 
@@ -98,41 +82,17 @@ jobs:
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
 
           chmod 600 /tmp/staging_key
-
-          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no \
-
-            ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
-
-          set -e
-
-          cd /opt/app
-
-          export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-
-          export GITHUB_SHA="${{ github.sha }}"
-
-          export GITHUB_REF_NAME="${{ github.ref_name }}"
-
-          export HOST_PORT=5001
-
-          export ENVIRONMENT=staging
-
-          echo "=== Deploying ${GITHUB_SHA:0:7} to staging (port ${HOST_PORT}) ==="
-
-          sudo docker compose down --remove-orphans
-
-          sudo HOST_PORT="${HOST_PORT}" ENVIRONMENT="${ENVIRONMENT}" \
-
-               DEPLOY_TIME="${DEPLOY_TIME}" GITHUB_SHA="${GITHUB_SHA}" \
-
-               GITHUB_REF_NAME="${GITHUB_REF_NAME}" \
-
-               docker compose up -d --build
-
-          echo '=== Staging deploy complete ==='
-
-          sudo docker compose ps
-
+          # Connecting to the VM to run Docker commands
+          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+            set -e
+            cd /opt/app
+            export HOST_PORT=5001
+            export ENVIRONMENT=staging
+            echo "=== Deploying to staging (port ${HOST_PORT}) ==="
+            sudo docker compose down --remove-orphans
+            sudo HOST_PORT=${HOST_PORT} ENVIRONMENT=${ENVIRONMENT} docker compose up -d --build
+            echo '=== Staging deploy complete ==='
+            sudo docker compose ps
           EOF
 
           rm /tmp/staging_key
