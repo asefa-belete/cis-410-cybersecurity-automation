@@ -1,9 +1,8 @@
 # .github/workflows/deploy-staging.yml
-
-
-
-
-
+# ─────────────────────────────────────────────────────────────────────────
+# Lean deploy — Docker already installed by setup-staging.yml.
+# Trigger: manual only (workflow_dispatch).
+# ─────────────────────────────────────────────────────────────────────────
 
 name: "Deploy — Staging"
 
@@ -15,7 +14,7 @@ on:
     inputs:
 
       reason:
-        description: 'Reason for this deployment'
+        description: 'Reason for this deployment (e.g. QA approved)'
         required: false
 
 jobs:
@@ -38,7 +37,7 @@ jobs:
 
         run: echo "STAGING DEPLOY — ${{ github.event.inputs.reason || 'no reason provided' }} — ${{ github.actor }}"
 
-
+      # Step 3: Copy app files - FIXED: No more '.' in scp
       - name: Copy app files to Staging VM
 
         run: |
@@ -46,18 +45,15 @@ jobs:
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
 
           chmod 600 /tmp/staging_key
-          # Pre-create directory and fix permissions
-          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "sudo mkdir -p /opt/app && sudo chown student:student /opt/app"
-          # Single-line copy command (no spaces around @)
-          scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r . ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
+          # Ensure the target directory exists and is owned by the student user
+          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "sudo mkdir -p /opt/app && sudo chown ${{ secrets.STAGING_USER }}:${{ secrets.STAGING_USER }} /opt/app"
+          # Copy specific files only
+          scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r \
+            app/ Dockerfile .dockerignore docker-compose.yml \
+            ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
           rm /tmp/staging_key
 
-
-
-
-
-
-
+      # Step 4: Build and start the container
       - name: Deploy Flask container on Staging
 
         run: |
@@ -65,27 +61,32 @@ jobs:
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
 
           chmod 600 /tmp/staging_key
-          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
-            set -e
-            cd /opt/app
-            export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-            export GITHUB_SHA="${{ github.sha }}"
-            export GITHUB_REF_NAME="${{ github.ref_name }}"
-            export HOST_PORT=5001
-            export ENVIRONMENT=staging
-
-            sudo docker compose down --remove-orphans
-            sudo HOST_PORT="${HOST_PORT}" ENVIRONMENT="${ENVIRONMENT}" \
-                 DEPLOY_TIME="${DEPLOY_TIME}" GITHUB_SHA="${GITHUB_SHA}" \
-                 GITHUB_REF_NAME="${GITHUB_REF_NAME}" \
-                 docker compose up -d --build
-
-            sudo docker compose ps
+          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no \
+            ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+          set -e
+          cd /opt/app
+          export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          export GITHUB_SHA="${{ github.sha }}"
+          export GITHUB_REF_NAME="${{ github.ref_name }}"
+          export HOST_PORT=5001
+          export ENVIRONMENT=staging
+          
+          echo "=== Deploying ${GITHUB_SHA:0:7} to staging (port ${HOST_PORT}) ==="
+          
+          # Use sudo -E to preserve environment variables for Docker Compose
+          sudo -E HOST_PORT="${HOST_PORT}" ENVIRONMENT="${ENVIRONMENT}" docker compose down --remove-orphans
+          sudo -E HOST_PORT="${HOST_PORT}" ENVIRONMENT="${ENVIRONMENT}" \
+               DEPLOY_TIME="${DEPLOY_TIME}" GITHUB_SHA="${GITHUB_SHA}" \
+               GITHUB_REF_NAME="${GITHUB_REF_NAME}" \
+               docker compose up -d --build
+               
+          echo '=== Staging deploy complete ==='
+          sudo docker compose ps
           EOF
 
           rm /tmp/staging_key
 
-
+      # Step 5: Smoke test
       - name: Smoke test
 
         run: |
@@ -93,3 +94,4 @@ jobs:
           curl -f "http://${{ secrets.STAGING_HOST }}:5001/health" | python3 -m json.tool
 
           echo '=== Staging smoke test passed ==='
+          
