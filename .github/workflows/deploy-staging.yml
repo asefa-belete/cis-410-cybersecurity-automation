@@ -15,8 +15,7 @@ on:
     inputs:
 
       reason:
-
-        description: 'Reason for this deployment (e.g. QA approved, ticket PROJ-142)'
+        description: 'Reason for this deployment'
         required: false
 
 jobs:
@@ -29,30 +28,32 @@ jobs:
 
 
     steps:
-      # Step 1: Check out the code
+
       - name: Checkout
 
         uses: actions/checkout@v4
 
-      # Step 2: Write deployment reason to audit trail
+
       - name: Log deployment reason
 
         run: echo "STAGING DEPLOY — ${{ github.event.inputs.reason || 'no reason provided' }} — ${{ github.actor }}"
 
-      # Step 3: Copy app files to /opt/app on Staging VM
+
       - name: Copy app files to Staging VM
 
         run: |
 
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
-          
+
           chmod 600 /tmp/staging_key
-          # Using '.' copies everything in the current folder to the destination
+          # Create directory and set ownership first to prevent permission errors
+          ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "sudo mkdir -p /opt/app && sudo chown student:student /opt/app"
+          # Copy all contents from the current folder (.) to the VM
           scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r . ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
           rm /tmp/staging_key
 
 
-      # Step 4: Build and start the container
+
 
 
 
@@ -72,23 +73,23 @@ jobs:
             export GITHUB_REF_NAME="${{ github.ref_name }}"
             export HOST_PORT=5001
             export ENVIRONMENT=staging
-            echo "=== Deploying ${GITHUB_SHA:0:7} to staging (port ${HOST_PORT}) ==="
+
             sudo docker compose down --remove-orphans
             sudo HOST_PORT="${HOST_PORT}" ENVIRONMENT="${ENVIRONMENT}" \
                  DEPLOY_TIME="${DEPLOY_TIME}" GITHUB_SHA="${GITHUB_SHA}" \
                  GITHUB_REF_NAME="${GITHUB_REF_NAME}" \
                  docker compose up -d --build
-            echo '=== Staging deploy complete ==='
+
             sudo docker compose ps
           EOF
 
           rm /tmp/staging_key
 
-      # Step 5: Smoke test
+
       - name: Smoke test
 
         run: |
           sleep 5
           curl -f "http://${{ secrets.STAGING_HOST }}:5001/health" | python3 -m json.tool
-
+          
           echo '=== Staging smoke test passed ==='
