@@ -1,9 +1,9 @@
 # .github/workflows/deploy-staging.yml
-# ─────────────────────────────────────────────────────────────────────────
-# Lean deploy — Docker already installed by setup-staging.yml.
 
-# Trigger: manual only (workflow_dispatch).
-# ─────────────────────────────────────────────────────────────────────────
+
+
+
+
 
 name: "Deploy — Staging"
 
@@ -46,9 +46,9 @@ jobs:
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
 
           chmod 600 /tmp/staging_key
-          # Create directory and set ownership first to prevent permission errors
+          # Pre-create directory and fix permissions
           ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "sudo mkdir -p /opt/app && sudo chown student:student /opt/app"
-          # Copy all contents from the current folder (.) to the VM
+          # Single-line copy command (no spaces around @)
           scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r . ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
           rm /tmp/staging_key
 
@@ -91,5 +91,5 @@ jobs:
         run: |
           sleep 5
           curl -f "http://${{ secrets.STAGING_HOST }}:5001/health" | python3 -m json.tool
-          
+
           echo '=== Staging smoke test passed ==='
