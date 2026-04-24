@@ -45,10 +45,10 @@ jobs:
         run: |
 
           echo "${{ secrets.STAGING_SSH_KEY }}" > /tmp/staging_key
-
+          
           chmod 600 /tmp/staging_key
-          # Fixed scp: Combined to one line and ensuring no space between user and host
-          scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r app/ Dockerfile .dockerignore docker-compose.yml ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
+          # Using '.' copies everything in the current folder to the destination
+          scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r . ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
           rm /tmp/staging_key
 
 
@@ -90,5 +90,5 @@ jobs:
         run: |
           sleep 5
           curl -f "http://${{ secrets.STAGING_HOST }}:5001/health" | python3 -m json.tool
-          
+
           echo '=== Staging smoke test passed ==='
