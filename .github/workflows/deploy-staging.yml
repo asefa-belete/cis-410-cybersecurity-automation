@@ -71,11 +71,9 @@ jobs:
           chmod 600 /tmp/staging_key
 
           scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r \
-
-            app/ Dockerfile .dockerignore docker-compose.yml \
-
+            app/ Dockerfile docker-compose.yml \
             ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
-
+            
           rm /tmp/staging_key
 
 
