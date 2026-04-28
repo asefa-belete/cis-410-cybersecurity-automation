@@ -79,18 +79,15 @@ jobs:
             export HOST_PORT=5002
             export ENVIRONMENT=production
 
-            export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+
             export GITHUB_SHA="${{ github.sha }}"
 
-            echo "=== Starting Production Deploy on Port ${HOST_PORT} ==="
-            # sudo -E is critical to pass HOST_PORT and ENVIRONMENT to docker compose
+
             sudo -E docker compose down --remove-orphans
             sudo -E docker compose up -d --build
-            
-            echo '=== Production deploy complete ==='
-            sudo docker compose ps
-          EOF
 
+          EOF
+          
           rm /tmp/prod_key
 
 
