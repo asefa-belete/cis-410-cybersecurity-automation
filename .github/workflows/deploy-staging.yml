@@ -86,22 +86,16 @@ jobs:
           ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
             set -e
             cd /opt/app
-            # Variables for the environment
+
             export HOST_PORT=5001
             export ENVIRONMENT=staging
             export GITHUB_SHA="${{ github.sha }}"
-            export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-            
-            echo "=== Starting Staging Deploy on Port ${HOST_PORT} ==="
-            
-            # Use sudo -E to pass the exported variables into docker compose
+            # -E is critical here to pass the environment variables
             sudo -E docker compose down --remove-orphans
             sudo -E docker compose up -d --build
-            
-            echo "=== Staging deploy complete ==="
-            sudo docker compose ps
-          EOF
 
+          EOF
+          
           rm /tmp/staging_key
 
 
