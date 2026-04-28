@@ -29,7 +29,7 @@ on:
       reason:
 
         description: 'Reason for this deployment (required — audit trail)'
-        required: true 
+        required: true
 
 jobs:
 
@@ -46,14 +46,11 @@ jobs:
 
         uses: actions/checkout@v4
 
-
-
-
-
-
-
-
-
+      - name: Log deployment reason
+        run: |
+          echo "=== PRODUCTION DEPLOY ==="
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Reason: ${{ github.event.inputs.reason }}"
 
       - name: Copy app files to Production VM
 
@@ -62,7 +59,9 @@ jobs:
           echo "${{ secrets.PROD_SSH_KEY }}" > /tmp/prod_key
 
           chmod 600 /tmp/prod_key
-          scp -i /tmp/prod_key -o StrictHostKeyChecking=no -r app/ Dockerfile docker-compose.yml ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}:/opt/app/
+          scp -i /tmp/prod_key -o StrictHostKeyChecking=no -r \
+            app/ Dockerfile .dockerignore docker-compose.yml \
+            ${{ secrets.PROD_USER }}@${{ secrets.PROD_HOST }}:/opt/app/
           rm /tmp/prod_key
 
 
@@ -79,11 +78,17 @@ jobs:
             cd /opt/app
             export HOST_PORT=5002
             export ENVIRONMENT=production
-            export GITHUB_SHA=${{ github.sha }}
+
             export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-            
+            export GITHUB_SHA="${{ github.sha }}"
+
+            echo "=== Starting Production Deploy on Port ${HOST_PORT} ==="
+            # sudo -E is critical to pass HOST_PORT and ENVIRONMENT to docker compose
             sudo -E docker compose down --remove-orphans
-            sudo -E HOST_PORT=${HOST_PORT} ENVIRONMENT=${ENVIRONMENT} DEPLOY_TIME="${DEPLOY_TIME}" GITHUB_SHA="${GITHUB_SHA}" docker compose up -d --build
+            sudo -E docker compose up -d --build
+            
+            echo '=== Production deploy complete ==='
+            sudo docker compose ps
           EOF
 
           rm /tmp/prod_key
@@ -96,5 +101,4 @@ jobs:
         run: |
           sleep 5
           curl -f "http://${{ secrets.PROD_HOST }}:5002/health" | python3 -m json.tool
-
-           echo '=== Production smoke test passed ==='
+          echo '=== Production smoke test passed ==='
