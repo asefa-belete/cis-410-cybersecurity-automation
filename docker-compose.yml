@@ -3,14 +3,13 @@ version: '3.8'
 services:
   flask-app:
     build: .
-    # This allows the workflow to change the port (e.g., 5001 or 5002)
     ports:
-
+      # Allows changing the port (5001 or 5002)
       - "${HOST_PORT:-5000}:5000"
-    # This allows the workflow to change the badge and header
     environment:
-    
+      # Injects the environment name for the badge
       - ENVIRONMENT=${ENVIRONMENT:-dev}
       - GITHUB_SHA=${GITHUB_SHA:-unknown}
       - DEPLOY_TIME=${DEPLOY_TIME:-unknown}
+      - APP_VERSION=week4-release
     restart: always
