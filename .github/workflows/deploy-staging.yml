@@ -70,7 +70,7 @@ jobs:
 
           chmod 600 /tmp/staging_key
           ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} "sudo mkdir -p /opt/app && sudo chown ${{ secrets.STAGING_USER }}:${{ secrets.STAGING_USER }} /opt/app"
-          scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r app/ Dockerfile docker-compose.yml ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
+          scp -i /tmp/staging_key -o StrictHostKeyChecking=no -r app/ Dockerfile .dockerignore docker-compose.yml ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/opt/app/
           rm /tmp/staging_key
 
 
@@ -86,15 +86,17 @@ jobs:
           ssh -i /tmp/staging_key -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
             set -e
             cd /opt/app
+            # Variables for the environment
             export HOST_PORT=5001
             export ENVIRONMENT=staging
-            export GITHUB_SHA=${{ github.sha }}
+            export GITHUB_SHA="${{ github.sha }}"
             export DEPLOY_TIME="$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
             
-            echo "=== Starting Docker Compose on Port ${HOST_PORT} ==="
-            # sudo -E is the fix for Port 5001
+            echo "=== Starting Staging Deploy on Port ${HOST_PORT} ==="
+            
+            # Use sudo -E to pass the exported variables into docker compose
             sudo -E docker compose down --remove-orphans
-            sudo -E HOST_PORT=${HOST_PORT} ENVIRONMENT=${ENVIRONMENT} DEPLOY_TIME="${DEPLOY_TIME}" GITHUB_SHA="${GITHUB_SHA}" docker compose up -d --build
+            sudo -E docker compose up -d --build
             
             echo "=== Staging deploy complete ==="
             sudo docker compose ps
@@ -116,4 +118,4 @@ jobs:
         run: |
           sleep 5
           curl -f "http://${{ secrets.STAGING_HOST }}:5001/health" | python3 -m json.tool
-           echo '=== Staging smoke test passed ==='
+          echo '=== Staging smoke test passed ==='
