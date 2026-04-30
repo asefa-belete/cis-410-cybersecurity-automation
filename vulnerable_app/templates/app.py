@@ -51,9 +51,9 @@ def search():
     results, error, query = [], None, None
     if q:
         # VULNERABLE: string formatting in SQL — Semgrep will flag this
-        query = "SELECT * FROM users WHERE username = '" + q + "'"
+        query = "SELECT * FROM users WHERE username = ?"
         try:
-            results = DB.execute(query).fetchall()
+            results = DB.execute(query, (q,)).fetchall()
         except Exception as e:
             error = str(e)
     return render_template('search.html', q=q, query=query, results=results, error=error, **ctx())
@@ -75,5 +75,11 @@ def health():
     })
 
 if __name__ == '__main__':
-    # VULNERABILITY: debug=True — never use in production
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Pulls from environment; defaults to False if not set
+    debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+    
+    app.run(
+        host='0.0.0.0', 
+        port=int(os.environ.get('PORT', 5000)), 
+        debug=debug_mode
+    )
