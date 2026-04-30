@@ -51,7 +51,7 @@ def search():
     results, error, query = [], None, None
     if q:
         # VULNERABLE: string formatting in SQL — Semgrep will flag this
-        query = "SELECT * FROM users WHERE username = '" + q + "'"
+        query = "SELECT * FROM users WHERE username = ?"
         try:
             results = DB.execute(query, (q,)).fetchall()
         except Exception as e:
