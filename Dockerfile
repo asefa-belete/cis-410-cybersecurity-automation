@@ -32,19 +32,28 @@
 #   Verify: docker compose exec web whoami  →  returns 'root' not 'appuser'
 # ─────────────────────────────────────────────────────────────────────────────
 
-# VIOLATION 1: Unpinned base image
-FROM python:3.12-slim
+# FIX 1: Use a specific, slim base image to reduce OS vulnerabilities
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# VIOLATION 2: Copy everything before installing dependencies — no layer caching
-COPY . .
+# FIX 3: Add a non-root user (appuser) to prevent root escalation
+RUN adduser --disabled-password appuser
 
-# app/requirements.txt is populated by copying vulnerable_app/requirements.txt
-# into app/ before committing (see HOW TO USE above)
-RUN pip install --no-cache-dir -r app/requirements.txt
+# FIX 2: Copy requirements and install deps BEFORE source code for layer caching
+COPY app/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the application source code
+COPY app/ app/
+
+# Ensure the non-root user owns the app directory
+RUN chown -R appuser:appuser /app
+
+# FIX 3 (continued): Switch to the non-root user
+USER appuser
 
 EXPOSE 5000
 
-# VIOLATION 3: No USER instruction — runs as root
+
 CMD ["python", "app/app.py"]
