@@ -101,17 +101,17 @@ jobs:
 
           gcloud run deploy ${SERVICE} \
 
-            --image ${IMAGE_PATH} \
+          --image us-central1-docker.pkg.dev/cis410-asefa/cis410-app/flask-app:${{ github.sha }} \
 
-            --region ${REGION} \
+          --region us-central1 \
 
-            --platform managed \
+          --platform managed \
 
-            --allow-unauthenticated \
+          --allow-unauthenticated \
 
-            --max-instances 3 \
-
-            --quiet
+          --max-instances 3 \
+          
+          --quiet
 
 
       - name: Print service URL
