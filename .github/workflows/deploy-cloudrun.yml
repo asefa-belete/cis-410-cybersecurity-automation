@@ -102,10 +102,4 @@ jobs:
 
       - name: Print service URL
 
-        run: |
-
-          gcloud run services describe ${SERVICE} \
-
-            --region ${REGION} \
-
-            --format "value(status.url)"
+        run: gcloud run services describe cis410-app --region=us-central1 --format="value(status.url)"
